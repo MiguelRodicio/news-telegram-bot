@@ -1,10 +1,12 @@
-import aiohttp
+import asyncio
 import httpx
 import requests
+from newsdataapi import NewsDataApiClient
+from telegram.constants import ParseMode
+from translate import Translator
 from typing import Final
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext, Application
-import asyncio
 
 # Crear una cola asyncio
 update_queue = asyncio.Queue()
@@ -15,45 +17,53 @@ API_URL: Final = 'https://newsdata.io/api/1/news?apikey=pub_3912528cdd15f7bd5992
 BOT_USERNAME: Final = '@DailyNewsBot_bot'
 
 
-async def get_api_data():
-    async with httpx.AsyncClient() as client:
-        response = await client.get(API_URL, params={'apikey': API_KEY})
+async def get_news_data_from_api(update: Update, context: ContextTypes.DEFAULT_TYPE, language: str, country: str):
+    if language == 'en':
+        await update.message.reply_text("Getting news data in english")
 
-        if response.status_code == 200:
-            data = response.json()
-            if 'results' in data:
-                return data['results']
-            else:
-                print("Error: 'results' key not found in API response")
-                return []
-        else:
-            print("Error obtaining data from API:", response.status_code)
-            return []
-
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hi! I am DailyNewsBot")
-    news_data = await get_api_data()
-
-    if news_data:
-        # Iterar sobre cada artículo
-        for article in news_data:
-            # Construir el mensaje con los detalles del artículo
-            message = (f"📰 {article.get('title', 'N/A')}\n\n"
-                       f"Description: {article.get('description', 'N/A')}\n\n"
-                       f"Link: {article.get('link', 'N/A')}\n\n"
-                       f"Source URL: {article.get('source_url', 'N/A')}")
-            # Enviar el mensaje al usuario
-            await update.message.reply_text(message)
     else:
-        await update.message.reply_text("Lo siento, no se pudieron obtener los datos de noticias")
+        await update.message.reply_text("Obteniendo datos de noticias en español")
+
+    api = NewsDataApiClient(API_KEY)
+    res = api.news_api(country=country, language=language)
+    if 'results' in res:
+        news_data = res['results']
+        for article in news_data:
+            message = (f"📰 {article.get('title', 'N/A')}\n\n"
+                       f"{article.get('description', 'N/A')}\n\n"
+                       f"{article.get('link', 'N/A')}\n\n"
+                       f"{article.get('source_url', 'N/A')}")
+            message_parts = await split_message(message)
+
+            # Enviar cada parte del mensaje al usuario
+            for part in message_parts:
+                await update.message.reply_text(part)
+    else:
+        await update.message.reply_text("Lo siento, no se pudieron obtener los datos de noticias en español")
+
+
+async def news_english(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await get_news_data_from_api(update, context, 'en', 'us')
+
+
+async def news_spanish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await get_news_data_from_api(update, context, 'es', 'es')
+
+
+async def split_message(message: str):
+    """
+            This method splits in parts the message because Telegram
+            has a limit of 4096 characters.
+    """
+    return [message[i:i + 4096] for i in range(0, len(message), 4096)]
 
 
 if __name__ == '__main__':
     print("Starting bot...")
 
     app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('newses', news_spanish))
+    app.add_handler(CommandHandler('newsen', news_english))
 
     print("Polling...")
     app.run_polling()
