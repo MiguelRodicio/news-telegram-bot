@@ -1,1 +1,1 @@
-Telegram bot in Python that displays news
+Telegram bot in Python that displays news.
