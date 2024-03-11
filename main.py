@@ -1,20 +1,21 @@
-import asyncio
-import httpx
-import requests
 from newsdataapi import NewsDataApiClient
-from telegram.constants import ParseMode
-from translate import Translator
 from typing import Final
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext, Application
-
-# Crear una cola asyncio
-update_queue = asyncio.Queue()
+from telegram.ext import CommandHandler, ContextTypes, Application
 
 TOKEN: Final = '7017203647:AAGyjotiPJGOYNVxY4r1M-r97VV7SRuS1Ag'
 API_KEY: Final = 'pub_3912528cdd15f7bd599255a186b90566fc632'
 API_URL: Final = 'https://newsdata.io/api/1/news?apikey=pub_3912528cdd15f7bd599255a186b90566fc632'
 BOT_USERNAME: Final = '@DailyNewsBot_bot'
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_message = (
+        "Hello! I'm a news bot. You can use the following commands:\n"
+        "/newses - Obtener noticias en español.\n"
+        "/newsen - Get news in English."
+    )
+    await update.message.reply_text(help_message)
 
 
 async def get_news_data_from_api(update: Update, context: ContextTypes.DEFAULT_TYPE, language: str, country: str):
@@ -64,6 +65,7 @@ if __name__ == '__main__':
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler('newses', news_spanish))
     app.add_handler(CommandHandler('newsen', news_english))
+    app.add_handler(CommandHandler('start', start))
 
     print("Polling...")
     app.run_polling()
